@@ -10,7 +10,7 @@ from requests_cache import CachedSession
 from tqdm import tqdm
 
 from configs import configure_argument_parser, configure_logging
-from constants import BASE_DIR, MAIN_DOC_URL
+from constants import BASE_DIR, EXPECTED_STATUS, MAIN_DOC_URL, PEP_URL
 from outputs import control_output
 from utils import find_tag, get_response
 
@@ -118,10 +118,60 @@ def download(session: CachedSession) -> None:
     logging.info(f'Архив был загружен и сохранён: {archive_path}')
 
 
+def pep(session: CachedSession) -> Optional[ResultsType]:
+    """Парсит PEP, считает статусы, возвращает статистику."""
+    response = get_response(session, PEP_URL)
+    if response is None:
+        return None
+
+    soup = BeautifulSoup(response.text, 'lxml')
+    tables = soup.find_all('table')
+
+    pep_rows = []
+    for table in tables:
+        for row in table.find_all('tr'):
+            if not row.find('th'):
+                pep_rows.append(row)
+
+    results = [('Статус', 'Количество')]
+    status_counts = {}
+
+    for row in tqdm(pep_rows):
+        tds = row.find_all('td')
+        if len(tds) < 2:
+            continue
+
+        type_and_status = tds[0].text.strip()
+        preview_status = type_and_status[1:] if len(type_and_status) > 1 else ''
+
+        pep_link_tag = tds[1].find('a')
+        if pep_link_tag is None:
+            continue
+
+        pep_link = pep_link_tag['href']
+
+        is_pep_zero = 'pep-0000' in pep_link or pep_link.endswith('/pep-0/')
+        if is_pep_zero:
+            continue
+
+        if preview_status not in status_counts:
+            status_counts[preview_status] = 0
+        status_counts[preview_status] += 1
+
+    for status, count in sorted(status_counts.items()):
+        status_name = status if status else 'Draft/Active'
+        results.append((status_name, count))
+
+    results.append(('Total', sum(status_counts.values())))
+
+    return results
+
+
 MODE_TO_FUNCTION = {
     'whats-new': whats_new,
     'latest-versions': latest_versions,
     'download': download,
+    'pep': pep,
 }
 
 
