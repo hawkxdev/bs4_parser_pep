@@ -1,6 +1,7 @@
 """Парсер документации Python: точка входа и функции парсинга."""
 import logging
 import re
+from collections import Counter
 from typing import List, Optional, Tuple
 from urllib.parse import urljoin
 
@@ -155,7 +156,7 @@ def pep(session: CachedSession) -> Optional[ResultsType]:
     pep_rows = get_pep_rows(soup)
 
     results = [('Статус', 'Количество')]
-    status_counts = {}
+    status_counts = Counter()
 
     for row in tqdm(pep_rows):
         tds = row.find_all('td')
@@ -186,8 +187,6 @@ def pep(session: CachedSession) -> Optional[ResultsType]:
                 f'Ожидаемые статусы: {list(expected_statuses)}'
             )
 
-        if actual_status not in status_counts:
-            status_counts[actual_status] = 0
         status_counts[actual_status] += 1
 
     for status, count in sorted(status_counts.items()):
