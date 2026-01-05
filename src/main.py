@@ -11,7 +11,11 @@ from requests_cache import CachedSession
 from tqdm import tqdm
 
 from configs import configure_argument_parser, configure_logging
-from constants import BASE_DIR, EXPECTED_STATUS, MAIN_DOC_URL, PEP_URL
+from constants import (
+    BASE_DIR, EXPECTED_STATUS, MAIN_DOC_URL, MIN_PEP_TABLE_COLUMNS,
+    PEP_NUMBER_COLUMN, PEP_STATUS_CHAR_INDEX, PEP_TYPE_STATUS_COLUMN, PEP_URL
+)
+from exceptions import ParserFindTagException
 from outputs import control_output
 from utils import find_tag, get_response
 
@@ -69,7 +73,7 @@ def latest_versions(session: CachedSession) -> Optional[ResultsType]:
             a_tags = ul.find_all('a')
             break
     else:
-        raise Exception('Не найден список c версиями Python')
+        raise ParserFindTagException('Не найден список c версиями Python')
 
     results = [('Ссылка на документацию', 'Версия', 'Статус')]
     pattern = r'Python (?P<version>\d\.\d+) \((?P<status>.*)\)'
@@ -160,12 +164,14 @@ def pep(session: CachedSession) -> Optional[ResultsType]:
 
     for row in tqdm(pep_rows):
         tds = row.find_all('td')
-        if len(tds) < 2:
+        if len(tds) < MIN_PEP_TABLE_COLUMNS:
             continue
 
-        preview_status = tds[0].text.strip()[1:2]
+        status_cell = tds[PEP_TYPE_STATUS_COLUMN].text.strip()
+        idx = PEP_STATUS_CHAR_INDEX
+        preview_status = status_cell[idx:idx + 1]
 
-        pep_link_tag = tds[1].find('a')
+        pep_link_tag = tds[PEP_NUMBER_COLUMN].find('a')
         if pep_link_tag is None:
             continue
 
