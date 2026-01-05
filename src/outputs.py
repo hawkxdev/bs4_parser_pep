@@ -1,4 +1,4 @@
-"""Модуль вывода результатов: терминал, PrettyTable, CSV."""
+"""Вывод результатов парсера."""
 import csv
 import datetime as dt
 import logging
@@ -14,7 +14,7 @@ ResultsType = List[Tuple[str, ...]]
 
 
 def control_output(results: ResultsType, cli_args: Namespace) -> None:
-    """Направляет результаты в нужный вывод (pretty/file/default)."""
+    """Направляет результаты в выбранный вывод."""
     output = cli_args.output
 
     if output == 'pretty':
@@ -26,13 +26,13 @@ def control_output(results: ResultsType, cli_args: Namespace) -> None:
 
 
 def default_output(results: ResultsType) -> None:
-    """Выводит результаты построчно в терминал."""
+    """Построчный вывод в терминал."""
     for row in results:
         print(*row)
 
 
 def pretty_output(results: ResultsType) -> None:
-    """Выводит результаты в виде PrettyTable."""
+    """Вывод таблицей PrettyTable."""
     table = PrettyTable()
     table.field_names = results[0]
     table.align = 'l'
@@ -41,7 +41,7 @@ def pretty_output(results: ResultsType) -> None:
 
 
 def file_output(results: ResultsType, cli_args: Namespace) -> None:
-    """Сохраняет результаты в CSV-файл в директории results/."""
+    """Сохраняет результаты в CSV."""
     results_dir = BASE_DIR / 'results'
     results_dir.mkdir(exist_ok=True)
 
