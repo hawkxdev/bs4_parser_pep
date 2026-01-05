@@ -88,7 +88,7 @@ def latest_versions(session: CachedSession) -> Optional[ResultsType]:
 
 
 def download(session: CachedSession) -> None:
-    """Скачивает PDF-документацию Python в директорию downloads/."""
+    """Скачивает документацию Python в директорию downloads/."""
     downloads_url = urljoin(MAIN_DOC_URL, 'download.html')
 
     response = get_response(session, downloads_url)
@@ -98,16 +98,18 @@ def download(session: CachedSession) -> None:
     soup = BeautifulSoup(response.text, 'lxml')
     main_tag = find_tag(soup, 'div', {'role': 'main'})
     table_tag = find_tag(main_tag, 'table', {'class': 'docutils'})
-    pdf_a4_tag = find_tag(
-        table_tag, 'a', {'href': re.compile(r'.+pdf-a4\.zip$')}
-    )
-
-    pdf_a4_link = pdf_a4_tag['href']
-    archive_url = urljoin(downloads_url, pdf_a4_link)
-    filename = archive_url.split('/')[-1]
 
     downloads_dir = BASE_DIR / 'downloads'
     downloads_dir.mkdir(exist_ok=True)
+
+    archive_tag = table_tag.find('a', {'href': re.compile(r'.+html\.zip$')})
+    if archive_tag is None:
+        logging.warning('Архив не найден')
+        return
+
+    archive_link = archive_tag['href']
+    archive_url = urljoin(downloads_url, archive_link)
+    filename = archive_url.split('/')[-1]
     archive_path = downloads_dir / filename
 
     response = session.get(archive_url)
@@ -115,7 +117,7 @@ def download(session: CachedSession) -> None:
     with open(archive_path, 'wb') as file:
         file.write(response.content)
 
-    logging.info(f'Архив был загружен и сохранён: {archive_path}')
+    logging.info(f'Архив был загружен: {archive_path}')
 
 
 def get_pep_status(session: CachedSession, pep_url: str) -> Optional[str]:
