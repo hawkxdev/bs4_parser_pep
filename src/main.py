@@ -118,20 +118,39 @@ def download(session: CachedSession) -> None:
     logging.info(f'Архив был загружен и сохранён: {archive_path}')
 
 
+def get_pep_status(session: CachedSession, pep_url: str) -> Optional[str]:
+    """Извлекает статус со страницы PEP."""
+    response = get_response(session, pep_url)
+    if response is None:
+        return None
+
+    pep_soup = BeautifulSoup(response.text, 'lxml')
+    status_dt = pep_soup.find(string='Status')
+
+    if status_dt is None:
+        return None
+
+    return str(status_dt.parent.find_next_sibling('dd').string)
+
+
+def get_pep_rows(soup: BeautifulSoup) -> list:
+    """Извлекает строки PEP из таблиц."""
+    rows = []
+    for table in soup.find_all('table'):
+        for row in table.find_all('tr'):
+            if not row.find('th'):
+                rows.append(row)
+    return rows
+
+
 def pep(session: CachedSession) -> Optional[ResultsType]:
-    """Парсит PEP, считает статусы, возвращает статистику."""
+    """Парсит PEP, считает статусы."""
     response = get_response(session, PEP_URL)
     if response is None:
         return None
 
     soup = BeautifulSoup(response.text, 'lxml')
-    tables = soup.find_all('table')
-
-    pep_rows = []
-    for table in tables:
-        for row in table.find_all('tr'):
-            if not row.find('th'):
-                pep_rows.append(row)
+    pep_rows = get_pep_rows(soup)
 
     results = [('Статус', 'Количество')]
     status_counts = {}
@@ -141,26 +160,36 @@ def pep(session: CachedSession) -> Optional[ResultsType]:
         if len(tds) < 2:
             continue
 
-        type_and_status = tds[0].text.strip()
-        preview_status = type_and_status[1:] if len(type_and_status) > 1 else ''
+        preview_status = tds[0].text.strip()[1:2]
 
         pep_link_tag = tds[1].find('a')
         if pep_link_tag is None:
             continue
 
         pep_link = pep_link_tag['href']
-
-        is_pep_zero = 'pep-0000' in pep_link or pep_link.endswith('/pep-0/')
-        if is_pep_zero:
+        if 'pep-0000' in pep_link or pep_link.endswith('/pep-0/'):
             continue
 
-        if preview_status not in status_counts:
-            status_counts[preview_status] = 0
-        status_counts[preview_status] += 1
+        pep_url = urljoin(PEP_URL, pep_link)
+        actual_status = get_pep_status(session, pep_url)
+        if actual_status is None:
+            continue
+
+        expected_statuses = EXPECTED_STATUS.get(preview_status, ())
+        if actual_status not in expected_statuses:
+            logging.warning(
+                f'Несовпадающие статусы:\n'
+                f'{pep_url}\n'
+                f'Статус в карточке: {actual_status}\n'
+                f'Ожидаемые статусы: {list(expected_statuses)}'
+            )
+
+        if actual_status not in status_counts:
+            status_counts[actual_status] = 0
+        status_counts[actual_status] += 1
 
     for status, count in sorted(status_counts.items()):
-        status_name = status if status else 'Draft/Active'
-        results.append((status_name, count))
+        results.append((status, count))
 
     results.append(('Total', sum(status_counts.values())))
 
