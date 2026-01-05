@@ -13,6 +13,7 @@ def get_response(session: CachedSession, url: str) -> Optional[Response]:
     """Выполняет GET-запрос с обработкой ошибок."""
     try:
         response = session.get(url)
+        response.raise_for_status()
         response.encoding = 'utf-8'
         return response
 
@@ -29,12 +30,10 @@ def find_tag(
     tag: str,
     attrs: Optional[dict] = None
 ) -> Tag:
-    """Ищет тег в soup, выбрасывает ParserFindTagException если не найден."""
+    """Ищет тег или выбрасывает исключение."""
     searched_tag = soup.find(tag, attrs=(attrs or {}))
 
     if searched_tag is None:
-        error_msg = f'Не найден тег {tag} {attrs}'
-        logging.error(error_msg, stack_info=True)
-        raise ParserFindTagException(error_msg)
+        raise ParserFindTagException(f'Не найден тег {tag} {attrs}')
 
     return searched_tag
