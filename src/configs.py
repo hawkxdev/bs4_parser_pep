@@ -1,4 +1,4 @@
-"""Конфигурация парсера: CLI-аргументы и логирование."""
+"""Конфигурация парсера."""
 import argparse
 import logging
 from logging.handlers import RotatingFileHandler
@@ -7,14 +7,16 @@ from typing import Iterable
 from constants import BASE_DIR
 
 
-LOG_FORMAT = '"%(asctime)s - [%(levelname)s] - %(message)s"'
+LOG_FORMAT = '%(asctime)s - [%(levelname)s] - %(message)s'
 DT_FORMAT = '%d.%m.%Y %H:%M:%S'
+MAX_LOG_SIZE_BYTES = 10 ** 6  # 1 MB
+LOG_BACKUP_COUNT = 5
 
 
 def configure_argument_parser(
     available_modes: Iterable[str]
 ) -> argparse.ArgumentParser:
-    """Создаёт парсер CLI-аргументов с режимами работы."""
+    """Создаёт парсер CLI-аргументов."""
     parser = argparse.ArgumentParser(description='Парсер документации Python')
 
     parser.add_argument(
@@ -39,13 +41,16 @@ def configure_argument_parser(
 
 
 def configure_logging() -> None:
-    """Настраивает логирование с RotatingFileHandler."""
+    """Настраивает логирование."""
     log_dir = BASE_DIR / 'logs'
     log_dir.mkdir(exist_ok=True)
     log_file = log_dir / 'parser.log'
 
     rotating_handler = RotatingFileHandler(
-        log_file, maxBytes=10 ** 6, backupCount=5, encoding='utf-8'
+        log_file,
+        maxBytes=MAX_LOG_SIZE_BYTES,
+        backupCount=LOG_BACKUP_COUNT,
+        encoding='utf-8'
     )
 
     logging.basicConfig(
