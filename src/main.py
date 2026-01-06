@@ -6,14 +6,15 @@ from typing import List, Optional, Tuple
 from urllib.parse import urljoin
 
 import requests_cache
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from requests_cache import CachedSession
 from tqdm import tqdm
 
 from configs import configure_argument_parser, configure_logging
 from constants import (
     BASE_DIR, EXPECTED_STATUS, MAIN_DOC_URL, MIN_PEP_TABLE_COLUMNS,
-    PEP_NUMBER_COLUMN, PEP_STATUS_CHAR_INDEX, PEP_TYPE_STATUS_COLUMN, PEP_URL
+    PEP_NUMBER_COLUMN, PEP_STATUS_CHAR_INDEX, PEP_TYPE_STATUS_COLUMN, PEP_URL,
+    PEP_ZERO_PATTERNS
 )
 from exceptions import ParserFindTagException
 from outputs import control_output
@@ -137,10 +138,13 @@ def get_pep_status(session: CachedSession, pep_url: str) -> Optional[str]:
     if status_dt is None:
         return None
 
-    return str(status_dt.parent.find_next_sibling('dd').string)
+    status_dd = status_dt.parent.find_next_sibling('dd')
+    if status_dd is None:
+        return None
+    return str(status_dd.string)
 
 
-def get_pep_rows(soup: BeautifulSoup) -> list:
+def get_pep_rows(soup: BeautifulSoup) -> list[Tag]:
     """Извлекает строки PEP из таблиц."""
     rows = []
     for table in soup.find_all('table'):
@@ -176,7 +180,7 @@ def pep(session: CachedSession) -> Optional[ResultsType]:
             continue
 
         pep_link = pep_link_tag['href']
-        if 'pep-0000' in pep_link or pep_link.endswith('/pep-0/'):
+        if any(pattern in pep_link for pattern in PEP_ZERO_PATTERNS):
             continue
 
         pep_url = urljoin(PEP_URL, pep_link)
@@ -195,9 +199,7 @@ def pep(session: CachedSession) -> Optional[ResultsType]:
 
         status_counts[actual_status] += 1
 
-    for status, count in sorted(status_counts.items()):
-        results.append((status, count))
-
+    results.extend(sorted(status_counts.items()))
     results.append(('Total', sum(status_counts.values())))
 
     return results
